@@ -3,225 +3,70 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>My Device Info — Web API Demo</title>
-<style>
-  :root {
-    --bg: #0f1220;
-    --card: #1a1e33;
-    --card2: #232848;
-    --text: #e8eaf6;
-    --muted: #9aa0c3;
-    --accent: #6c7bff;
-    --accent2: #3ddc97;
-    --danger: #ff6b6b;
-    --border: #2c3159;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    background: radial-gradient(1200px 600px at 50% -10%, #1b2143, var(--bg));
-    color: var(--text);
-    min-height: 100vh;
-    padding: 24px 16px 60px;
-  }
-  .wrap { max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 1.6rem; margin: 8px 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 24px; font-size: .95rem; }
-  .notice {
-    background: var(--card2);
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--accent2);
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 24px;
-    font-size: .9rem;
-    color: var(--muted);
-    line-height: 1.5;
-  }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 20px;
-    margin-bottom: 18px;
-  }
-  .card h2 { font-size: 1.05rem; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
-  .row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: .92rem; }
-  .row:last-child { border-bottom: none; }
-  .row .k { color: var(--muted); }
-  .row .v { text-align: right; word-break: break-word; }
-  button {
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    padding: 11px 18px;
-    font-size: .95rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform .06s ease, opacity .2s;
-  }
-  button:hover { opacity: .92; }
-  button:active { transform: translateY(1px); }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
-  video { width: 100%; border-radius: 10px; background: #000; margin-top: 12px; display: none; }
-  #shot { width: 100%; border-radius: 10px; margin-top: 12px; display: none; border: 2px solid var(--accent2); }
-  .status { font-size: .85rem; color: var(--muted); margin-top: 10px; }
-  .status.ok { color: var(--accent2); }
-  .status.err { color: var(--danger); }
-  footer { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 30px; }
-  a { color: var(--accent); }
-</style>
+<title>Device Info</title>
 </head>
 <body>
-<div class="wrap">
-  <h1>My Device Info</h1>
-  <p class="sub">Automatically reads your IP, location, and takes a photo — after you allow the browser prompts.</p>
+  <h3>Location</h3>
+  <p>Latitude: <span id="lat">—</span></p>
+  <p>Longitude: <span id="lon">—</span></p>
+  <p id="locStatus"></p>
 
-  <div class="notice">
-    <strong>Privacy:</strong> Everything on this page stays in <em>your</em> browser. Your IP,
-    location, and camera photo are shown only to you and are <strong>never sent to any server</strong>.
-    Your browser will ask permission before sharing your location or camera — you can say no.
-  </div>
+  <h3>Photo</h3>
+  <img id="shot" alt="photo" style="max-width:100%;display:none;" />
+  <p id="camStatus"></p>
 
-  <!-- IP -->
-  <div class="card">
-    <h2>🌐 Your IP address</h2>
-    <div class="row"><span class="k">Public IP</span><span class="v" id="ip">—</span></div>
-    <div class="row"><span class="k">Approx. city</span><span class="v" id="ipcity">—</span></div>
-    <div class="row"><span class="k">Country</span><span class="v" id="ipcountry">—</span></div>
-    <div class="status" id="ipStatus">Looking up your IP…</div>
-  </div>
-
-  <!-- Location -->
-  <div class="card">
-    <h2>📍 Your location</h2>
-    <div class="row"><span class="k">Latitude</span><span class="v" id="lat">—</span></div>
-    <div class="row"><span class="k">Longitude</span><span class="v" id="lon">—</span></div>
-    <div class="row"><span class="k">Accuracy</span><span class="v" id="acc">—</span></div>
-    <div class="status" id="locStatus">Requesting location… allow the prompt.</div>
-    <div class="btn-row" id="locRetryRow" style="display:none;">
-      <button id="locBtn">Try again</button>
-    </div>
-  </div>
-
-  <!-- Camera -->
-  <div class="card">
-    <h2>🤳 Selfie camera</h2>
-    <video id="video" autoplay playsinline muted></video>
-    <img id="shot" alt="Your captured photo" />
-    <div class="status" id="camStatus">Requesting camera… allow the prompt.</div>
-    <div class="btn-row" id="camRetryRow" style="display:none;">
-      <button id="camBtn">Try again</button>
-    </div>
-  </div>
-
-  <footer>Built as an educational web-API demo · use responsibly and only with people's consent.</footer>
-</div>
+  <video id="video" autoplay playsinline muted style="display:none;"></video>
 
 <script>
-  // ---------- IP ----------
-  (async function () {
-    const st = document.getElementById('ipStatus');
-    try {
-      const r = await fetch('https://ipapi.co/json/');
-      if (!r.ok) throw new Error('lookup failed');
-      const d = await r.json();
-      document.getElementById('ip').textContent = d.ip || '—';
-      document.getElementById('ipcity').textContent = d.city || '—';
-      document.getElementById('ipcountry').textContent = (d.country_name || '—') + (d.country ? ' (' + d.country + ')' : '');
-      st.textContent = 'This is your public IP, as seen by websites you visit.';
-      st.className = 'status ok';
-    } catch (e) {
-      st.textContent = 'Could not look up IP (the free lookup service may be rate-limited).';
-      st.className = 'status err';
-    }
-  })();
-
-  // ---------- Location (automatic) ----------
+  // ---- Location ----
   function getLocation() {
-    const st = document.getElementById('locStatus');
-    const retry = document.getElementById('locRetryRow');
-    if (!navigator.geolocation) {
-      st.textContent = 'Geolocation is not supported by this browser.';
-      st.className = 'status err';
-      return;
-    }
-    st.textContent = 'Requesting location… allow the prompt.';
-    st.className = 'status';
+    var st = document.getElementById('locStatus');
+    if (!navigator.geolocation) { st.textContent = 'Geolocation not supported.'; return; }
+    st.textContent = 'Requesting location…';
     navigator.geolocation.getCurrentPosition(
       function (pos) {
-        document.getElementById('lat').textContent = pos.coords.latitude.toFixed(6);
-        document.getElementById('lon').textContent = pos.coords.longitude.toFixed(6);
-        document.getElementById('acc').textContent = Math.round(pos.coords.accuracy) + ' m';
-        st.innerHTML = 'Got it! <a target="_blank" href="https://www.openstreetmap.org/?mlat=' +
-          pos.coords.latitude + '&mlon=' + pos.coords.longitude + '#map=16/' +
-          pos.coords.latitude + '/' + pos.coords.longitude + '">View on map ↗</a>';
-        st.className = 'status ok';
-        retry.style.display = 'none';
+        document.getElementById('lat').textContent = pos.coords.latitude;
+        document.getElementById('lon').textContent = pos.coords.longitude;
+        st.textContent = '';
       },
-      function (err) {
-        st.textContent = 'Location denied or unavailable: ' + err.message;
-        st.className = 'status err';
-        retry.style.display = 'flex';
-      },
+      function (err) { st.textContent = 'Location error: ' + err.message; },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
-  document.getElementById('locBtn').addEventListener('click', getLocation);
 
-  // ---------- Camera (automatic capture) ----------
-  let stream = null;
-  const video = document.getElementById('video');
-  const shot = document.getElementById('shot');
-  const camStatus = document.getElementById('camStatus');
-  const camRetry = document.getElementById('camRetryRow');
+  // ---- Camera + auto capture ----
+  var stream = null;
+  var video = document.getElementById('video');
+  var shot = document.getElementById('shot');
+  var camStatus = document.getElementById('camStatus');
 
   function capturePhoto() {
     if (!stream) return;
-    const canvas = document.createElement('canvas');
+    var canvas = document.createElement('canvas');
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     shot.src = canvas.toDataURL('image/png');
     shot.style.display = 'block';
-    camStatus.textContent = 'Photo captured automatically. It stays in your browser only.';
-    camStatus.className = 'status ok';
+    camStatus.textContent = '';
   }
 
-  async function startCamera() {
-    try {
-      camStatus.textContent = 'Requesting camera… allow the prompt.';
-      camStatus.className = 'status';
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-      video.srcObject = stream;
-      video.style.display = 'block';
-      shot.style.display = 'none';
-      camRetry.style.display = 'none';
-      // The requested "authorized" alert:
-      alert('Camera access authorized ✅');
-      camStatus.textContent = 'Camera on — capturing photo…';
-      camStatus.className = 'status ok';
-      // Auto-capture once the video has a real frame.
-      if (video.readyState >= 2) {
-        setTimeout(capturePhoto, 600);
-      } else {
-        video.addEventListener('loadeddata', function () { setTimeout(capturePhoto, 600); }, { once: true });
-      }
-    } catch (e) {
-      camStatus.textContent = 'Camera denied or unavailable: ' + e.message;
-      camStatus.className = 'status err';
-      camRetry.style.display = 'flex';
-    }
+  function startCamera() {
+    camStatus.textContent = 'Requesting camera…';
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      .then(function (s) {
+        stream = s;
+        video.srcObject = stream;
+        alert('Camera access authorized');
+        if (video.readyState >= 2) { setTimeout(capturePhoto, 600); }
+        else { video.addEventListener('loadeddata', function () { setTimeout(capturePhoto, 600); }, { once: true }); }
+      })
+      .catch(function (e) { camStatus.textContent = 'Camera error: ' + e.message; });
   }
-  document.getElementById('camBtn').addEventListener('click', startCamera);
 
-  // ---------- Run everything automatically on load ----------
+  // ---- Run on load ----
   window.addEventListener('load', function () {
     getLocation();
-    // Slight delay so the location prompt and the camera prompt don't collide.
     setTimeout(startCamera, 400);
   });
 </script>
