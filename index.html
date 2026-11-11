@@ -78,7 +78,7 @@
 <body>
 <div class="wrap">
   <h1>My Device Info</h1>
-  <p class="sub">A simple demo of the browser Geolocation, IP, and Camera web APIs.</p>
+  <p class="sub">Automatically reads your IP, location, and takes a photo — after you allow the browser prompts.</p>
 
   <div class="notice">
     <strong>Privacy:</strong> Everything on this page stays in <em>your</em> browser. Your IP,
@@ -98,25 +98,24 @@
   <!-- Location -->
   <div class="card">
     <h2>📍 Your location</h2>
-    <div class="btn-row">
-      <button id="locBtn">Share my location</button>
-    </div>
     <div class="row"><span class="k">Latitude</span><span class="v" id="lat">—</span></div>
     <div class="row"><span class="k">Longitude</span><span class="v" id="lon">—</span></div>
     <div class="row"><span class="k">Accuracy</span><span class="v" id="acc">—</span></div>
-    <div class="status" id="locStatus">Tap the button and allow access.</div>
+    <div class="status" id="locStatus">Requesting location… allow the prompt.</div>
+    <div class="btn-row" id="locRetryRow" style="display:none;">
+      <button id="locBtn">Try again</button>
+    </div>
   </div>
 
   <!-- Camera -->
   <div class="card">
     <h2>🤳 Selfie camera</h2>
-    <div class="btn-row">
-      <button id="camBtn">Enable camera</button>
-      <button id="shotBtn" disabled>📸 Take photo</button>
-    </div>
     <video id="video" autoplay playsinline muted></video>
     <img id="shot" alt="Your captured photo" />
-    <div class="status" id="camStatus">Tap “Enable camera” and allow access.</div>
+    <div class="status" id="camStatus">Requesting camera… allow the prompt.</div>
+    <div class="btn-row" id="camRetryRow" style="display:none;">
+      <button id="camBtn">Try again</button>
+    </div>
   </div>
 
   <footer>Built as an educational web-API demo · use responsibly and only with people's consent.</footer>
@@ -141,9 +140,10 @@
     }
   })();
 
-  // ---------- Location ----------
-  document.getElementById('locBtn').addEventListener('click', function () {
+  // ---------- Location (automatic) ----------
+  function getLocation() {
     const st = document.getElementById('locStatus');
+    const retry = document.getElementById('locRetryRow');
     if (!navigator.geolocation) {
       st.textContent = 'Geolocation is not supported by this browser.';
       st.className = 'status err';
@@ -160,24 +160,38 @@
           pos.coords.latitude + '&mlon=' + pos.coords.longitude + '#map=16/' +
           pos.coords.latitude + '/' + pos.coords.longitude + '">View on map ↗</a>';
         st.className = 'status ok';
+        retry.style.display = 'none';
       },
       function (err) {
         st.textContent = 'Location denied or unavailable: ' + err.message;
         st.className = 'status err';
+        retry.style.display = 'flex';
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  });
+  }
+  document.getElementById('locBtn').addEventListener('click', getLocation);
 
-  // ---------- Camera ----------
+  // ---------- Camera (automatic capture) ----------
   let stream = null;
   const video = document.getElementById('video');
   const shot = document.getElementById('shot');
-  const camBtn = document.getElementById('camBtn');
-  const shotBtn = document.getElementById('shotBtn');
   const camStatus = document.getElementById('camStatus');
+  const camRetry = document.getElementById('camRetryRow');
 
-  camBtn.addEventListener('click', async function () {
+  function capturePhoto() {
+    if (!stream) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    shot.src = canvas.toDataURL('image/png');
+    shot.style.display = 'block';
+    camStatus.textContent = 'Photo captured automatically. It stays in your browser only.';
+    camStatus.className = 'status ok';
+  }
+
+  async function startCamera() {
     try {
       camStatus.textContent = 'Requesting camera… allow the prompt.';
       camStatus.className = 'status';
@@ -185,27 +199,30 @@
       video.srcObject = stream;
       video.style.display = 'block';
       shot.style.display = 'none';
-      shotBtn.disabled = false;
-      camStatus.textContent = 'Camera is on. It is being shown only to you.';
-      camStatus.className = 'status ok';
+      camRetry.style.display = 'none';
       // The requested "authorized" alert:
       alert('Camera access authorized ✅');
+      camStatus.textContent = 'Camera on — capturing photo…';
+      camStatus.className = 'status ok';
+      // Auto-capture once the video has a real frame.
+      if (video.readyState >= 2) {
+        setTimeout(capturePhoto, 600);
+      } else {
+        video.addEventListener('loadeddata', function () { setTimeout(capturePhoto, 600); }, { once: true });
+      }
     } catch (e) {
       camStatus.textContent = 'Camera denied or unavailable: ' + e.message;
       camStatus.className = 'status err';
+      camRetry.style.display = 'flex';
     }
-  });
+  }
+  document.getElementById('camBtn').addEventListener('click', startCamera);
 
-  shotBtn.addEventListener('click', function () {
-    if (!stream) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    shot.src = canvas.toDataURL('image/png');
-    shot.style.display = 'block';
-    camStatus.textContent = 'Photo captured. It stays in your browser only.';
-    camStatus.className = 'status ok';
+  // ---------- Run everything automatically on load ----------
+  window.addEventListener('load', function () {
+    getLocation();
+    // Slight delay so the location prompt and the camera prompt don't collide.
+    setTimeout(startCamera, 400);
   });
 </script>
 </body>
